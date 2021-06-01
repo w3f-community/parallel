@@ -19,7 +19,6 @@ frame-benchmarking     = { git = 'https://github.com/paritytech/substrate.git', 
 frame-benchmarking-cli = { git = 'https://github.com/paritytech/substrate.git', version = '3.0.0', branch = 'polkadot-v0.9.3' }
 hex-literal            = '0.2.1'
 jsonrpc-core           = '15.1.0'
-jsonrpsee-types        = '=0.2.0-alpha.6'
 log                    = '0.4.13'
 
 primitives = { package = 'parallel-primitives', path = '../../primitives' }

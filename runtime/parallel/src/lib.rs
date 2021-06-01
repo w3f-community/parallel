@@ -22,7 +22,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use codec::Encode;
 use frame_support::{
-    traits::{All, IsInVec, LockIdentifier, U128CurrencyToVote},
+    traits::{All, Contains, IsInVec, LockIdentifier, U128CurrencyToVote},
     PalletId,
 };
 use orml_currencies::BasicCurrencyAdapter;
@@ -38,6 +38,7 @@ use sp_runtime::{
     transaction_validity::{TransactionSource, TransactionValidity},
     ApplyExtrinsicResult, KeyTypeId, Percent, SaturatedConversion,
 };
+use sp_std::marker::PhantomData;
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -60,7 +61,10 @@ use xcm_builder::{
     SiblingParachainConvertsVia, SignedAccountId32AsNative, SignedToAccountId32,
     SovereignSignedViaLocation, TakeWeightCredit, UsingComponents,
 };
-use xcm_executor::{Config, XcmExecutor};
+use xcm_executor::{
+    traits::{FilterAssetLocation, ShouldExecute},
+    Config, XcmExecutor,
+};
 
 // re-exports
 pub use pallet_liquid_staking;
@@ -547,11 +551,54 @@ parameter_types! {
     pub AllowUnpaidFrom: Vec<MultiLocation> = vec![ MultiLocation::X1(Junction::Parent) ];
 }
 
+/// Transparent XcmTransact Barrier for sybil demo. Polkadot will probably come up with a
+/// better solution for this. Currently, they have not setup a barrier config for `XcmTransact`
+pub struct AllowXcmTransactFrom<T>(PhantomData<T>);
+impl<T: Contains<MultiLocation>> ShouldExecute for AllowXcmTransactFrom<T> {
+    fn should_execute<Call>(
+        _origin: &MultiLocation,
+        _top_level: bool,
+        message: &Xcm<Call>,
+        _shallow_weight: Weight,
+        _weight_credit: &mut Weight,
+    ) -> Result<(), ()> {
+        match message {
+            Xcm::Transact {
+                origin_type: _,
+                require_weight_at_most: _,
+                call: _,
+            } => Ok(()),
+            _ => Err(()),
+        }
+    }
+}
+
 pub type Barrier = (
     TakeWeightCredit,
     AllowTopLevelPaidExecutionFrom<All<MultiLocation>>,
     AllowUnpaidExecutionFrom<IsInVec<AllowUnpaidFrom>>, // <- Parent gets free execution
+    AllowXcmTransactFrom<All<MultiLocation>>,
 );
+
+pub struct CrosschainConcreteAsset;
+impl FilterAssetLocation for CrosschainConcreteAsset {
+    fn filter_asset_location(asset: &MultiAsset, origin: &MultiLocation) -> bool {
+        match asset {
+            MultiAsset::ConcreteFungible { .. } => match origin {
+                Null | X1(Plurality { .. }) => true,
+                X1(AccountId32 { .. }) => true,
+                X1(Parent { .. }) => true,
+                X1(Parachain { .. }) => true,
+                X2(Parachain { .. }, _) => true,
+                X2(Parent { .. }, _) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
+pub type ReserveAsset = (NativeAsset, CrosschainConcreteAsset);
 
 pub struct XcmConfig;
 impl Config for XcmConfig {
@@ -560,8 +607,8 @@ impl Config for XcmConfig {
     // How to withdraw and deposit an asset.
     type AssetTransactor = LocalAssetTransactor;
     type OriginConverter = XcmOriginToTransactDispatchOrigin;
-    type IsReserve = NativeAsset;
-    type IsTeleporter = NativeAsset; // <- should be enough to allow teleportation of ROC
+    type IsReserve = ReserveAsset;
+    type IsTeleporter = ReserveAsset; // <- should be enough to allow teleportation of ROC
     type LocationInverter = LocationInverter<Ancestry>;
     type Barrier = Barrier;
     type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
