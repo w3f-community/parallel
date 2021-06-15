@@ -938,8 +938,8 @@ construct_runtime!(
         UnknownTokens: orml_unknown_tokens::{Pallet, Storage, Event},
 
         // Consensus
-        Aura: pallet_aura::{Pallet, Config<T>},
-        AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
+        Aura: pallet_aura::{Pallet, Storage, Config<T>},
+        AuraExt: cumulus_pallet_aura_ext::{Pallet, Storage, Config},
 
         // Parallel pallets
         Loans: pallet_loans::{Pallet, Call, Storage, Event<T>, Config},

@@ -671,12 +671,15 @@ construct_runtime!(
         Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
         Utility: pallet_utility::{Pallet, Call, Event},
         Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>},
+
         // Consensus
-        Aura: pallet_aura::{Pallet, Config<T>},
+        Aura: pallet_aura::{Pallet, Storage, Config<T>},
         Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config, Event},
+
         // Currencies
         Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
+
         // Governance
         Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
         Democracy: pallet_democracy::{Pallet, Call, Storage, Config<T>, Event<T>},
@@ -686,6 +689,7 @@ construct_runtime!(
         Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
         Elections: pallet_elections_phragmen::{Pallet, Call, Storage, Event<T>, Config<T>},
         TechnicalMembership: pallet_membership::<Instance1>::{Pallet, Call, Storage, Event<T>, Config<T>},
+
         // Oracles
         OracleMembership: pallet_membership::<Instance2>::{Pallet, Call, Storage, Event<T>, Config<T>},
 
