@@ -595,7 +595,8 @@ pub type XcmOriginToTransactDispatchOrigin = (
 );
 
 parameter_types! {
-    pub UnitWeightCost: Weight = 1_000;
+    // One XCM operation is 1_000_000 weight - almost certainly a conservative estimate.
+    pub UnitWeightCost: Weight = 1_000_000;
 }
 
 parameter_types! {
