@@ -20,12 +20,12 @@ pallet-timestamp  = { git = 'https://github.com/paritytech/substrate.git', branc
 
 primitives      = { package = 'parallel-primitives', path = '../../primitives', default-features = false }
 serde           = { version = '1', features = ['derive'] }
+sp-core         = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', version = '3.0.0', default-features = false }
 sp-runtime      = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', version = '3.0.0', default-features = false }
 sp-std          = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', version = '3.0.0', default-features = false }
 
 [dev-dependencies]
 lazy_static       = { version = '1.4.0' }
-sp-core           = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', version = '3.0.0', default-features = false }
 sp-io             = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', version = '3.0.0', default-features = false }
 
 

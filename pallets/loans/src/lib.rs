@@ -19,6 +19,14 @@
 //! Loans pallet implement the lending protocol by using a pool-based strategy
 //! that aggregates each user's supplied assets. The interest rate is dynamically
 //! determined by the supply and demand.
+//!
+//! ## Liquidation
+//!
+//! This pallet also enable the offchain worker to perform the liquidation.
+//! The collator may opt-in with a pre-funded account. The liquidate strategy is:
+//! - find the unhealthy account which has exceeded loans
+//! - liquidate the currency with higher loans
+//! - liquidator gets any of the affordable collaterals.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::unused_unit)]
@@ -33,6 +41,9 @@ use frame_support::{
     transactional, PalletId,
 };
 use frame_system::pallet_prelude::*;
+use frame_system::offchain::{
+    AppCrypto, CreateSignedTransaction,
+};
 use orml_traits::{MultiCurrency, MultiCurrencyExtended};
 pub use pallet::*;
 use primitives::{
@@ -43,7 +54,7 @@ use sp_runtime::{
     traits::{
         AccountIdConversion, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, StaticLookup, Zero,
     },
-    FixedPointNumber, FixedU128,
+    FixedPointNumber, FixedU128, Percent,
 };
 use sp_std::result::Result;
 use sp_std::vec::Vec;
@@ -52,6 +63,7 @@ pub use weights::WeightInfo;
 mod mock;
 mod rate_model;
 mod tests;
+pub mod liquidate;
 pub mod weights;
 
 /// Container for borrow balance information
@@ -86,7 +98,7 @@ pub mod pallet {
     use super::*;
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config: CreateSignedTransaction<Call<Self>> + frame_system::Config {
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
         /// Currency type for deposit/withdraw collateral assets to/from loans
@@ -117,6 +129,17 @@ pub mod pallet {
 
         /// Unix time
         type UnixTime: UnixTime;
+
+        /// The account type to perform liquidation
+        type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
+        /// The lockdown time when running offchain worker
+        #[pallet::constant]
+        type LockPeriod: Get<u64>;
+
+        /// The maximum value when liquidate a loan, may different with the loans pallet.
+        #[pallet::constant]
+        type LiquidateFactor: Get<Percent>;
     }
 
     #[pallet::error]
@@ -145,6 +168,12 @@ pub mod pallet {
         CurrencyNotEnabled,
         /// Currency's oracle price not ready
         PriceOracleNotReady,
+        /// There is no pre-configured currencies
+        NoCurrencies,
+        /// Failed to get lock to run offchain worker
+        GetLockFailed,
+        /// No signer available for liquidation, consider adding one via `author_insertKey` RPC.
+        NoAvailableAccount,
     }
 
     #[pallet::event]
@@ -444,6 +473,13 @@ pub mod pallet {
                     }
                 }
             });
+        }
+
+        fn offchain_worker(block_number: T::BlockNumber) {
+            match Self::liquidate(block_number) {
+                Err(e) => log::error!("Failed to run offchain liquidation: {:?}", e),
+                Ok(_) => log::info!("offchain liquidation processed successfully"),
+            };
         }
     }
 

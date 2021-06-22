@@ -106,37 +106,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alt_serde"
-version = "1.0.119"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbdd08f26bc9972e3597a32bb7fe2b0de4e85ccfb4214acec94165b940aa537e"
-dependencies = [
- "alt_serde_derive",
-]
-
-[[package]]
-name = "alt_serde_derive"
-version = "1.0.119"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "629ddaf5b2675d9a27e9521a88870f8edea113e4a83d6d5178268b0d70e9a9a3"
-dependencies = [
- "proc-macro2 1.0.27",
- "quote 1.0.9",
- "syn 1.0.73",
-]
-
-[[package]]
-name = "alt_serde_json"
-version = "1.0.61"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f0eb8296bb24f54901cbb46b675ce2d4e6099a47eea0024cf0f48068c70313"
-dependencies = [
- "alt_serde",
- "itoa",
- "ryu",
-]
-
-[[package]]
 name = "always-assert"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2871,7 +2840,6 @@ dependencies = [
  "pallet-democracy",
  "pallet-elections-phragmen",
  "pallet-liquid-staking",
- "pallet-liquidation",
  "pallet-loans",
  "pallet-loans-benchmarking",
  "pallet-membership",
@@ -5257,24 +5225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-liquidation"
-version = "3.0.0"
-dependencies = [
- "alt_serde",
- "alt_serde_json",
- "frame-support",
- "frame-system",
- "pallet-loans",
- "parallel-primitives",
- "parity-scale-codec",
- "sp-core",
- "sp-io",
- "sp-keystore",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
 name = "pallet-loans"
 version = "3.0.0"
 dependencies = [
@@ -5939,7 +5889,6 @@ dependencies = [
  "pallet-democracy",
  "pallet-elections-phragmen",
  "pallet-liquid-staking",
- "pallet-liquidation",
  "pallet-loans",
  "pallet-loans-benchmarking",
  "pallet-membership",
@@ -11401,7 +11350,6 @@ dependencies = [
  "pallet-elections-phragmen",
  "pallet-grandpa",
  "pallet-liquid-staking",
- "pallet-liquidation",
  "pallet-loans",
  "pallet-loans-benchmarking",
  "pallet-membership",

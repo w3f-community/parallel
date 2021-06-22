@@ -180,6 +180,12 @@ impl PriceFeeder for MOCK_PRICE_FEEDER {
     }
 }
 
+parameter_types! {
+    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
+    pub const LockPeriod: u64 = 20000; // in milli-seconds
+    pub const LiquidateFactor: Percent = Percent::from_percent(50);
+}
+
 impl Config for Runtime {
     type Event = Event;
     type Currency = Currencies;
@@ -189,10 +195,9 @@ impl Config for Runtime {
     type UpdateOrigin = EnsureRoot<AccountId>;
     type WeightInfo = ();
     type UnixTime = Timestamps;
-}
-
-parameter_types! {
-    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
+    type AuthorityId = loans::liquidate::crypto::AuthId;
+    type LockPeriod = LockPeriod;
+    type LiquidateFactor = LiquidateFactor;
 }
 
 pub struct ExtBuilder {

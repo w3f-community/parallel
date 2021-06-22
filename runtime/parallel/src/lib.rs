@@ -70,7 +70,6 @@ pub mod constants;
 // re-exports
 pub use constants::{currency, fee, time};
 pub use pallet_liquid_staking;
-pub use pallet_liquidation;
 pub use pallet_loans;
 pub use pallet_multisig;
 pub use pallet_prices;
@@ -254,8 +253,6 @@ impl orml_tokens::Config for Runtime {
 
 parameter_types! {
     pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
-
-    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
 }
 
 impl orml_currencies::Config for Runtime {
@@ -266,6 +263,11 @@ impl orml_currencies::Config for Runtime {
     type WeightInfo = ();
 }
 
+parameter_types! {
+    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
+    pub const LockPeriod: u64 = 20000; // in milli-seconds
+    pub const LiquidateFactor: Percent = Percent::from_percent(50);
+}
 impl pallet_loans::Config for Runtime {
     type Event = Event;
     type Currency = Currencies;
@@ -275,6 +277,9 @@ impl pallet_loans::Config for Runtime {
     type UpdateOrigin = EnsureRootOrHalfCouncil;
     type WeightInfo = pallet_loans::weights::SubstrateWeight<Runtime>;
     type UnixTime = Timestamp;
+    type AuthorityId = pallet_loans::liquidate::crypto::AuthId;
+    type LockPeriod = LockPeriod;
+    type LiquidateFactor = LiquidateFactor;
 }
 
 parameter_types! {
@@ -294,16 +299,6 @@ impl pallet_liquid_staking::Config for Runtime {
     type WithdrawOrigin = EnsureRoot<AccountId>;
     type MaxWithdrawAmount = MaxWithdrawAmount;
     type MaxAccountProcessingUnstake = MaxAccountProcessingUnstake;
-}
-
-parameter_types! {
-    pub const LockPeriod: u64 = 20000; // in milli-seconds
-    pub const LiquidateFactor: Percent = Percent::from_percent(50);
-}
-impl pallet_liquidation::Config for Runtime {
-    type AuthorityId = pallet_liquidation::crypto::AuthId;
-    type LockPeriod = LockPeriod;
-    type LiquidateFactor = LiquidateFactor;
 }
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
@@ -866,7 +861,6 @@ construct_runtime!(
         Oracle: orml_oracle::<Instance1>::{Pallet, Storage, Call, Event<T>},
         Loans: pallet_loans::{Pallet, Call, Storage, Event<T>, Config},
         LiquidStaking: pallet_liquid_staking::{Pallet, Call, Storage, Event<T>, Config},
-        Liquidation: pallet_liquidation::{Pallet, Call},
         Prices: pallet_prices::{Pallet, Storage, Call, Event<T>},
         Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>},
         Democracy: pallet_democracy::{Pallet, Call, Storage, Config<T>, Event<T>},

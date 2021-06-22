@@ -59,7 +59,6 @@ pub mod constants;
 
 pub use constants::{currency, fee, time};
 pub use pallet_liquid_staking;
-pub use pallet_liquidation;
 pub use pallet_loans;
 pub use pallet_multisig;
 
@@ -551,6 +550,8 @@ impl orml_oracle::Config<ParallelDataProvider> for Runtime {
 
 parameter_types! {
     pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
+    pub const LockPeriod: u64 = 20000; // in milli-seconds
+    pub const LiquidateFactor: Percent = Percent::from_percent(50);
 }
 impl pallet_loans::Config for Runtime {
     type Event = Event;
@@ -561,6 +562,9 @@ impl pallet_loans::Config for Runtime {
     type UpdateOrigin = EnsureRootOrHalfCouncil;
     type WeightInfo = pallet_loans::weights::SubstrateWeight<Runtime>;
     type UnixTime = Timestamp;
+    type AuthorityId = pallet_loans::liquidate::crypto::AuthId;
+    type LockPeriod = LockPeriod;
+    type LiquidateFactor = LiquidateFactor;
 }
 
 pub type TimeStampedPrice = orml_oracle::TimestampedValue<PriceWithDecimal, Moment>;
@@ -574,16 +578,6 @@ impl pallet_prices::Config for Runtime {
     type Event = Event;
     type Source = AggregatedDataProvider;
     type FeederOrigin = EnsureRoot<AccountId>;
-}
-
-parameter_types! {
-    pub const LockPeriod: u64 = 20000; // in milli-seconds
-    pub const LiquidateFactor: Percent = Percent::from_percent(50);
-}
-impl pallet_liquidation::Config for Runtime {
-    type AuthorityId = pallet_liquidation::crypto::AuthId;
-    type LockPeriod = LockPeriod;
-    type LiquidateFactor = LiquidateFactor;
 }
 
 parameter_types! {
@@ -704,7 +698,6 @@ construct_runtime!(
         // Parallel pallets
         Loans: pallet_loans::{Pallet, Call, Storage, Event<T>, Config},
         Prices: pallet_prices::{Pallet, Storage, Call, Event<T>},
-        Liquidation: pallet_liquidation::{Pallet, Call},
         LiquidStaking: pallet_liquid_staking::{Pallet, Call, Storage, Event<T>, Config},
     }
 );

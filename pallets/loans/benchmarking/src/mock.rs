@@ -224,6 +224,12 @@ impl orml_oracle::Config<Instance1> for Test {
     type Members = Members;
 }
 
+parameter_types! {
+    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
+    pub const LockPeriod: u64 = 20000; // in milli-seconds
+    pub const LiquidateFactor: Percent = Percent::from_percent(50);
+}
+
 impl pallet_loans::Config for Test {
     type Event = Event;
     type Currency = Currencies;
@@ -233,13 +239,12 @@ impl pallet_loans::Config for Test {
     type UpdateOrigin = EnsureRoot<AccountId>;
     type WeightInfo = ();
     type UnixTime = Timestamps;
+    type AuthorityId = pallet_loans::liquidate::crypto::AuthId;
+    type LockPeriod = LockPeriod;
+    type LiquidateFactor = LiquidateFactor;
 }
 
 impl crate::Config for Test {}
-
-parameter_types! {
-    pub const LoansPalletId: PalletId = PalletId(*b"par/loan");
-}
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = frame_system::GenesisConfig::default()

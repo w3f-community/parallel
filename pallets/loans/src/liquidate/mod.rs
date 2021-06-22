@@ -12,55 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Liquidate pallet
-//!
-//! ## Overview
-//!
-//! This pallets provides offchain worker to call the liquidate_borrow operation in loans pallet.
-//! The collator may opt-in with a pre-funded account. The liquidate strategy is:
-//! - find the unhealthy account which has exceeded loans
-//! - liquidate the currency with higher loans
-//! - liquidator gets any of the affordable collaterals.
+//! The liquidate implementation.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+pub mod crypto;
 
-use frame_support::{log, pallet_prelude::*};
-use frame_system::offchain::{
-    AppCrypto, CreateSignedTransaction, ForAny, SendSignedTransaction, Signer,
+use crate::pallet::*;
+use primitives::{Balance, CurrencyId, PriceFeeder};
+use frame_support::{
+	log, pallet_prelude::*,
 };
-use frame_system::pallet_prelude::*;
-use sp_core::crypto::KeyTypeId;
+use frame_system::offchain::{ForAny, SendSignedTransaction, Signer};
 use sp_runtime::{
     offchain::{
         storage_lock::{StorageLock, Time},
         Duration,
     },
-    traits::{CheckedAdd, CheckedMul, Zero},
-    FixedPointNumber, FixedU128, Percent,
+	traits::{CheckedAdd, CheckedMul, Zero},
+    FixedPointNumber, FixedU128,
 };
 use sp_std::collections::btree_map::BTreeMap;
 use sp_std::prelude::*;
-
-pub use pallet::*;
-use primitives::{Balance, CurrencyId, PriceFeeder};
-
-pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"pool");
-
-pub mod crypto {
-    use super::KEY_TYPE;
-    use sp_runtime::{
-        app_crypto::{app_crypto, sr25519},
-        MultiSignature, MultiSigner,
-    };
-    app_crypto!(sr25519, KEY_TYPE);
-
-    pub struct AuthId;
-    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for AuthId {
-        type RuntimeAppPublic = Public;
-        type GenericSignature = sp_core::sr25519::Signature;
-        type GenericPublic = sp_core::sr25519::Public;
-    }
-}
 
 /// The miscellaneous information when transforming borrow records.
 #[derive(Clone, Debug)]
@@ -78,82 +49,8 @@ struct CollateralMisc {
     value: FixedU128,
 }
 
-#[frame_support::pallet]
-pub mod pallet {
-    use super::*;
-
-    #[pallet::config]
-    pub trait Config:
-        CreateSignedTransaction<Call<Self>> + frame_system::Config + pallet_loans::Config
-    {
-        /// The account type to perform liquidation
-        type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
-
-        /// The lockdown time when running offchain worker
-        #[pallet::constant]
-        type LockPeriod: Get<u64>;
-
-        /// The maximum value when liquidate a loan, may different with the loans pallet.
-        #[pallet::constant]
-        type LiquidateFactor: Get<Percent>;
-    }
-
-    #[pallet::pallet]
-    #[pallet::generate_store(pub(super) trait Store)]
-    pub struct Pallet<T>(_);
-
-    #[pallet::error]
-    pub enum Error<T> {
-        /// There is no pre-configured currencies
-        NoCurrencies,
-        /// Failed to get lock to run offchain worker
-        GetLockFailed,
-        /// No signer available for liquidation, consider adding one via `author_insertKey` RPC.
-        NoAvailableAccount,
-    }
-
-    #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn offchain_worker(block_number: T::BlockNumber) {
-            match Self::liquidate(block_number) {
-                Err(e) => log::error!("Failed to run offchain liquidation: {:?}", e),
-                Ok(_) => log::info!("offchain liquidation processed successfully"),
-            };
-        }
-    }
-
-    #[pallet::call]
-    impl<T: Config> Pallet<T> {
-        /// The same liquidate_borrow call in loans pallet.
-        ///
-        /// - `borrower`: the owner of a loan
-        /// - `liquidate_currency`: the currency of a loan
-        /// - `repay_amount`: the amount will be liquidated
-        /// - `collateral_currency`: the currency that liquidator want to get after liquidation.
-        #[pallet::weight(10_000)]
-        fn liquidate_borrow(
-            origin: OriginFor<T>,
-            borrower: T::AccountId,
-            liquidate_currency: CurrencyId,
-            repay_amount: Balance,
-            collateral_currency: CurrencyId,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin)?;
-            pallet_loans::Pallet::<T>::liquidate_borrow_internal(
-                who,
-                borrower,
-                liquidate_currency,
-                repay_amount,
-                collateral_currency,
-            )?;
-
-            Ok(().into())
-        }
-    }
-}
-
 impl<T: Config> Pallet<T> {
-    fn liquidate(_block_number: T::BlockNumber) -> Result<(), Error<T>> {
+    pub(crate) fn liquidate(_block_number: T::BlockNumber) -> Result<(), Error<T>> {
         let mut lock = StorageLock::<Time>::with_deadline(
             b"liquidate::lock",
             Duration::from_millis(T::LockPeriod::get()),
@@ -182,11 +79,11 @@ impl<T: Config> Pallet<T> {
 
     fn transform_account_borrows(
     ) -> Result<BTreeMap<T::AccountId, (FixedU128, Vec<BorrowMisc>)>, Error<T>> {
-        let result = pallet_loans::AccountBorrows::<T>::iter().fold(
+        let result = AccountBorrows::<T>::iter().fold(
             BTreeMap::<T::AccountId, (FixedU128, Vec<BorrowMisc>)>::new(),
             |mut acc, (k1, k2, snapshot)| {
                 let loans_value = match T::PriceFeeder::get_price(&k1).and_then(|price_info| {
-                    let result = pallet_loans::Pallet::<T>::borrow_balance_stored_with_snapshot(
+                    let result = Self::borrow_balance_stored_with_snapshot(
                         &k1, snapshot,
                     );
                     price_info
@@ -223,11 +120,11 @@ impl<T: Config> Pallet<T> {
 
     fn transform_account_collateral(
     ) -> Result<BTreeMap<T::AccountId, (FixedU128, Vec<CollateralMisc>)>, Error<T>> {
-        let iter = pallet_loans::AccountDeposits::<T>::iter();
+        let iter = AccountDeposits::<T>::iter();
         let result = iter.filter(|(.., deposits)| deposits.is_collateral).fold(
             BTreeMap::<T::AccountId, (FixedU128, Vec<CollateralMisc>)>::new(),
             |mut acc, (k1, k2, deposits)| {
-                let balance = match pallet_loans::ExchangeRate::<T>::get(&k1)
+                let balance = match ExchangeRate::<T>::get(&k1)
                     .checked_mul_int(deposits.voucher_balance)
                 {
                     None => {
@@ -246,7 +143,7 @@ impl<T: Config> Pallet<T> {
                     Some(v) => v,
                 };
                 let under_collatoral_value = match collateral_value
-                    .checked_mul(&pallet_loans::CollateralFactor::<T>::get(&k1).into())
+                    .checked_mul(&CollateralFactor::<T>::get(&k1).into())
                 {
                     None => {
                         acc.remove(&k2);
