@@ -25,11 +25,22 @@ use frame_system::EnsureRoot;
 use lazy_static::lazy_static;
 use orml_traits::parameter_type_with_key;
 use primitives::{Amount, Balance, CurrencyId, Price, PriceDetail, PriceFeeder, Rate, Ratio};
-use sp_core::H256;
-use sp_runtime::traits::One;
-use sp_runtime::{testing::Header, traits::IdentityLookup};
+use sp_core::{
+    H256, sr25519::{Signature, Public},
+};
+use sp_runtime::{
+    traits::{
+        Extrinsic as ExtrinsicT, One, Verify,
+    },
+    Percent,
+};
+use sp_runtime::{
+    testing::{Header, TestXt},
+    traits::IdentityLookup
+};
 use sp_std::vec::Vec;
 use std::{collections::HashMap, sync::Mutex};
+use std::str::FromStr;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Runtime>;
 type Block = frame_system::mocking::MockBlock<Runtime>;
@@ -80,11 +91,11 @@ impl frame_system::Config for Runtime {
     type OnSetCode = ();
 }
 
-pub type AccountId = u128;
+pub type AccountId = Public;
 pub type BlockNumber = u64;
 
-pub const ALICE: AccountId = 1;
-pub const BOB: AccountId = 2;
+pub const ALICE: AccountId = Public::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").unwrap();
+pub const BOB: AccountId = Public::from_str("5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty").unwrap();
 
 pub const DOT: CurrencyId = CurrencyId::DOT;
 pub const KSM: CurrencyId = CurrencyId::KSM;
@@ -178,6 +189,33 @@ impl PriceFeeder for MOCK_PRICE_FEEDER {
     fn get_price(currency_id: &CurrencyId) -> Option<PriceDetail> {
         *MOCK_PRICE_FEEDER.lock().unwrap().get(currency_id).unwrap()
     }
+}
+
+type Extrinsic = TestXt<Call, ()>;
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Runtime where
+	Call: From<LocalCall>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = Extrinsic;
+}
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime where
+	Call: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: Call,
+		_public: <Signature as Verify>::Signer,
+		_account: AccountId,
+		nonce: u64,
+	) -> Option<(Call, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+		Some((call, (nonce, ())))
+	}
 }
 
 parameter_types! {
