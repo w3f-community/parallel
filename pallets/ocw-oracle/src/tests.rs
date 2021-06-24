@@ -282,7 +282,7 @@ fn insert_initial_data_works() {
 }
 
 #[test]
-fn aggregate_price_works() {
+fn aggregate_price_works_median() {
     let keystore = KeyStore::new();
     let (offchain, _offchain_state) = testing::TestOffchainExt::new();
     let (pool, _pool_state) = testing::TestTransactionPoolExt::new();
@@ -352,7 +352,7 @@ fn aggregate_price_works() {
         let charlie_price2 = TickerPayloadDetail {
             symbol: CurrencyId::DOT,
             data_source_enum: DataSourceEnum::BINANCE,
-            price: 45180,
+            price: 45190,
             timestamp: 1616844616682,
         };
         let charlie_payload_list = vec![charlie_price1, charlie_price2];
@@ -389,6 +389,121 @@ fn aggregate_price_works() {
         }
         // according to the price we mock submit above, the median price should be 45178
         assert_eq!(price, 45178);
+    });
+}
+
+#[test]
+fn aggregate_price_works_average() {
+    let keystore = KeyStore::new();
+    let (offchain, _offchain_state) = testing::TestOffchainExt::new();
+    let (pool, _pool_state) = testing::TestTransactionPoolExt::new();
+    let mut t = sp_io::TestExternalities::default();
+    t.register_extension(OffchainWorkerExt::new(offchain));
+    t.register_extension(TransactionPoolExt::new(pool));
+    t.register_extension(KeystoreExt(Arc::new(keystore)));
+    t.execute_with(|| {
+        let secret_alice = "//Alice";
+        let secret_bob = "//Bob";
+        let secret_charlie = "//Charlie";
+        assert_ok!(OcwOracle::insert_initial_data(Origin::root()));
+        let alice: AccountId = get_account_id_from_seed::<sr25519::Public>(secret_alice);
+        let bob: AccountId = get_account_id_from_seed::<sr25519::Public>(secret_bob);
+        let charlie: AccountId = get_account_id_from_seed::<sr25519::Public>(secret_charlie);
+        assert_ok!(OcwOracle::change_members(Origin::root(), vec![alice, bob]));
+        assert_eq!(System::block_number(), 0);
+        System::set_block_number(11);
+        let blocknumber = 10u64;
+        //test alice submit price
+        let alice_price1 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::COINCAP,
+            price: 45175,
+            timestamp: 1616844616682,
+        };
+        let alice_price2 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::BINANCE,
+            price: 45176,
+            timestamp: 1616844616682,
+        };
+        let alice_payload_list = vec![alice_price1, alice_price2];
+        let alice_payload = Payload {
+            index: blocknumber,
+            list: alice_payload_list,
+        };
+        OcwOracle::submit_price(Origin::signed(alice), alice_payload)
+            .expect("Insert payload should succeed");
+        //test bob submit price
+        let bob_price1 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::COINCAP,
+            price: 45177,
+            timestamp: 1616844616682,
+        };
+        let bob_price2 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::BINANCE,
+            price: 45178,
+            timestamp: 1616844616682,
+        };
+        let bob_payload_list = vec![bob_price1, bob_price2];
+        let bob_payload = Payload {
+            index: blocknumber,
+            list: bob_payload_list,
+        };
+        OcwOracle::submit_price(Origin::signed(bob), bob_payload)
+            .expect("Insert payload should succeed");
+        //test charlie submit price
+        let charlie_price1 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::COINCAP,
+            price: 45179,
+            timestamp: 1616844616682,
+        };
+        let charlie_price2 = TickerPayloadDetail {
+            symbol: CurrencyId::DOT,
+            data_source_enum: DataSourceEnum::BINANCE,
+            price: 45190,
+            timestamp: 1616844616682,
+        };
+        let charlie_payload_list = vec![charlie_price1, charlie_price2];
+        let charlie_payload = Payload {
+            index: blocknumber,
+            list: charlie_payload_list,
+        };
+        assert_noop!(
+            OcwOracle::submit_price(Origin::signed(charlie), charlie_payload.clone()),
+            Error::<Runtime>::NoPermission
+        );
+        assert_ok!(OcwOracle::change_members(
+            Origin::root(),
+            vec![alice, bob, charlie]
+        ));
+        OcwOracle::submit_price(Origin::signed(charlie), charlie_payload)
+            .expect("Insert payload should succeed");
+
+        // check on-chain round data
+        let onchain_round = OcwOracle::ocw_oracle_round(CurrencyId::DOT);
+        let right_round = Round {
+            index: 10,
+            provider: vec![alice, bob, charlie],
+            combined: false,
+            last_combined: 10,
+        };
+        assert_eq!(onchain_round, Some(right_round));
+
+        //check average aggregation strategy
+        assert_ok!(OcwOracle::change_aggregation_strategy(
+            Origin::root(),
+            AggregationStrategyEnum::AVERAGE
+        ));
+        OcwOracle::on_finalize(12);
+        let mut price = 0;
+        if let Some((p, _)) = OcwOracle::get_price(CurrencyId::DOT) {
+            price = p;
+        }
+        // according to the price we mock submit above, the average price should be 45179
+        assert_eq!(price, 45179);
     });
 }
 

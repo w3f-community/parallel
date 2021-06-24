@@ -17,6 +17,8 @@ use crate::*;
 mod median;
 use self::median::*;
 
+mod average;
+use self::average::*;
 pub trait AggregationStrategyApi<T: Config> {
     fn aggregate_price(
         round_index: &RoundIndex<T::BlockNumber>,
@@ -36,6 +38,8 @@ pub fn aggregate_price<T: Config>(
         AggregationStrategyEnum::MEDIAN => {
             Median::aggregate_price(round_index, provider, currency_id)
         }
-        AggregationStrategyEnum::AVERAGE => Err(<Error<T>>::NotImplement.into()),
+        AggregationStrategyEnum::AVERAGE => {
+            Average::aggregate_price(round_index, provider, currency_id)
+        }
     }
 }
