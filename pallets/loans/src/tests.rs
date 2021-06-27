@@ -825,7 +825,7 @@ fn borrow_balance_stored_works() {
                 borrow_index: Rate::one(),
             },
         );
-        assert_eq!(Loans::borrow_balance_stored(&ALICE, &DOT).unwrap(), 0);
+        assert_eq!(Loans::recent_borrow_balance(&ALICE, &DOT).unwrap(), 0);
 
         // snapshot.borrow_index = 0
         AccountBorrows::<Runtime>::insert(
@@ -836,7 +836,7 @@ fn borrow_balance_stored_works() {
                 borrow_index: Rate::zero(),
             },
         );
-        assert_eq!(Loans::borrow_balance_stored(&ALICE, &DOT).unwrap(), 0);
+        assert_eq!(Loans::recent_borrow_balance(&ALICE, &DOT).unwrap(), 0);
 
         // borrow_index = 1.2, snapshot.borrow_index = 1, snapshot.principal = 100
         BorrowIndex::<Runtime>::insert(DOT, Rate::saturating_from_rational(12, 10));
@@ -848,7 +848,7 @@ fn borrow_balance_stored_works() {
                 borrow_index: Rate::one(),
             },
         );
-        assert_eq!(Loans::borrow_balance_stored(&ALICE, &DOT).unwrap(), 120);
+        assert_eq!(Loans::recent_borrow_balance(&ALICE, &DOT).unwrap(), 120);
     })
 }
 
