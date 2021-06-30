@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["pallet_liquid_staking","pallet_liquidation","pallet_loans","pallet_prices","parallel_primitives"];
